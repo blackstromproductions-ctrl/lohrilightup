@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>💳 Payment - Halloween Neon Party</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    .glow-text {
+      background: linear-gradient(to right, #3b82f6, #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 15px rgba(59,130,246,0.6), 0 0 25px rgba(236,72,153,0.5);
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+
+  <!-- Header -->
+  <header class="fixed top-0 left-0 right-0 z-50 p-4 border-b bg-blue-50 flex items-center justify-center space-x-3 shadow-md">
+    <img src="your-logo.png" alt="Logo" class="w-10 h-10 object-contain" />
+    <h1 class="text-2xl font-extrabold glow-text tracking-wide text-center">BLACK STROM PRODUCTIONS</h1>
+  </header>
+
+  <main class="p-4 pt-28 max-w-md mx-auto">
+    <a href="tickets.html" class="text-blue-500 text-sm font-medium">&larr; Back to Tickets</a>
+
+    <h2 class="text-xl font-bold mt-4 mb-2">💳 Payment Details</h2>
+    <p class="text-gray-600 mb-4">Complete your purchase securely below.</p>
+
+    <!-- Order Summary -->
+    <div class="bg-white p-4 rounded-lg shadow mb-4">
+      <h3 class="font-semibold mb-2">🎟 Order Summary</h3>
+      <div id="order-summary" class="text-gray-700 space-y-1"></div>
+      <hr class="my-2" />
+      <p class="font-bold text-lg text-gray-800">Total: <span id="total-price">€0.00</span></p>
+    </div>
+
+    <!-- Payment Form -->
+    <div class="bg-white p-4 rounded-lg shadow space-y-3">
+      <label class="block">
+        <span class="font-medium">Full Name</span>
+        <input id="name" type="text" placeholder="Enter your full name"
+               class="mt-1 w-full border rounded p-2 focus:ring focus:ring-blue-200" />
+      </label>
+
+      <label class="block">
+        <span class="font-medium">Email Address</span>
+        <input id="email" type="email" placeholder="you@example.com"
+               class="mt-1 w-full border rounded p-2 focus:ring focus:ring-blue-200" />
+      </label>
+
+      <button id="payNowBtn" class="w-full bg-red-500 text-white py-2 rounded-lg font-semibold mt-4 hover:bg-red-600 transition">
+        PAY NOW
+      </button>
+    </div>
+  </main>
+
+  <script>
+    // Replace with your Stripe publishable key (pk_test_...)
+    var stripe = null;
+    var STRIPE_PUBLISHABLE_KEY = "pk_live_51SLLP5RuvK4X5n5QTYJUEZOLVMa299OoU1xj3XeMSEcY2MeZ3UE2i2RHziO8ttM6zj4inLZgxlytiBVaQlnc60Uy006Bb89ksb";
+
+    document.addEventListener("DOMContentLoaded", function () {
+      // Initialize Stripe
+      try {
+        stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+      } catch (e) {
+        console.error("Stripe initialization error:", e);
+        alert("Stripe failed to initialize. Check your publishable key.");
+        return;
+      }
+
+      var orderSummaryEl = document.getElementById("order-summary");
+      var totalPriceEl = document.getElementById("total-price");
+      var payBtn = document.getElementById("payNowBtn");
+
+      // Safely read localStorage values
+      var storedTickets = null;
+      var storedTotal = null;
+      try {
+        storedTickets = localStorage.getItem("selectedTickets");
+        storedTotal = localStorage.getItem("selectedTotal");
+      } catch (err) {
+        console.error("localStorage read error:", err);
+      }
+
+      var tickets = [];
+      var total = 0;
+
+      if (storedTickets) {
+        try {
+          var parsed = JSON.parse(storedTickets);
+          if (Array.isArray(parsed)) {
+            tickets = parsed;
+          }
+        } catch (err) {
+          console.warn("Could not parse selectedTickets:", err);
+          tickets = [];
+        }
+      }
+
+      if (storedTotal !== null && storedTotal !== undefined && storedTotal !== "") {
+        var parsedTotal = parseFloat(storedTotal);
+        if (!isNaN(parsedTotal)) {
+          total = parsedTotal;
+        }
+      } else {
+        // compute total from tickets if storedTotal missing
+        for (var i = 0; i < tickets.length; i++) {
+          var it = tickets[i];
+          var p = Number(it.price) || 0;
+          var q = Number(it.quantity) || 0;
+          total += p * q;
+        }
+      }
+
+      // Show order summary
+      orderSummaryEl.innerHTML = "";
+      if (tickets.length === 0) {
+        orderSummaryEl.innerHTML = '<p class="text-gray-400 italic">No ticket details found.</p>';
+      } else {
+        for (var j = 0; j < tickets.length; j++) {
+          var item = tickets[j];
+          var name = item.name || "Ticket";
+          var qty = Number(item.quantity) || 0;
+          var price = Number(item.price) || 0;
+          var pEl = document.createElement("p");
+          pEl.textContent = name + " ×" + qty + " — €" + (price * qty).toFixed(2);
+          orderSummaryEl.appendChild(pEl);
+        }
+      }
+
+      totalPriceEl.textContent = "€" + (total || 0).toFixed(2);
+
+      // Click handler: create checkout session and redirect
+      payBtn.addEventListener("click", function () {
+        var nameValue = document.getElementById("name").value.trim();
+        var emailValue = document.getElementById("email").value.trim();
+
+        if (!nameValue || !emailValue) {
+          alert("Please enter your full name and email address before proceeding.");
+          return;
+        }
+
+        if (!total || total <= 0) {
+          alert("Please select tickets before payment.");
+          window.location.href = "tickets.html";
+          return;
+        }
+
+        payBtn.disabled = true;
+        payBtn.textContent = "Redirecting...";
+
+        // Call backend to create a Stripe Checkout session
+        fetch("http://localhost:4242/create-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ totalAmount: total })
+        }).then(function (res) {
+          return res.json();
+        }).then(function (data) {
+          if (!data || !data.id) {
+            throw new Error("Invalid response from server");
+          }
+          // Redirect to Stripe Checkout
+          return stripe.redirectToCheckout({ sessionId: data.id });
+        }).then(function (result) {
+          if (result && result.error) {
+            // If redirectToCheckout fails, show error to customer
+            alert("Stripe error: " + result.error.message);
+            payBtn.disabled = false;
+            payBtn.textContent = "PAY NOW";
+          }
+        }).catch(function (err) {
+          console.error("Checkout error:", err);
+          alert("Could not start checkout. Ensure the server is running at http://localhost:4242");
+          payBtn.disabled = false;
+          payBtn.textContent = "PAY NOW";
+        });
+      });
+    });
+  </script>
+</body>
+</html>
