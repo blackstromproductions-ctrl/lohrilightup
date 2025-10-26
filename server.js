@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const stripe = new Stripe("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"); // Replace with your Stripe Secret Key
+const stripe = new Stripe("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"); // Replace with your Stripe Secret Key
 
 app.post("/create-checkout-session", async (req, res) => {
   try {
@@ -42,5 +42,6 @@ app.post("/create-checkout-session", async (req, res) => {
 app.get("/", (req, res) => {
   res.send("✅ Stripe server running successfully!");
 });
+
 
 app.listen(4242, () => console.log("🚀 Server running on http://localhost:4242"));
